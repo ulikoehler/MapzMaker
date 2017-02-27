@@ -6,6 +6,8 @@ import pyproj
 import svgwrite
 import functools
 import os.path
+import sys
+import traceback
 import numpy as np
 from UliEngineering.Math.Geometry import *
 from UliEngineering.Math.Coordinates import *
@@ -17,7 +19,7 @@ from .Projections import *
 from .ShapefileRecords import *
 from .NaturalEarth import *
 
-def shape_to_polys(shape, bbox):
+def shape_to_polys(shape, proj="merc"):
     points = np.asarray(shape.points.copy())
     # Mirror by X axis
     # as lower latitude represent more southern coords (in contrast to SVG)
@@ -28,10 +30,9 @@ def shape_to_polys(shape, bbox):
     # Find only polygons that are larger than a certain fraction
     # of the total area (i.e. remove tiny islands)
     polys = filter_shapes_by_total_area_threshold(points, shape.parts[1:], 0.001)
-    return poly
+    return polys
 
-def draw_single_map(dwg, name, polys, outfile, color="#000", proj="merc", objtype="country"):
-    polys = shape_to_polys(shape)
+def draw_single_map(dwg, name, polys, color="#000", objtype="country"):
     # Compute bbox only from remaining points
     bbox = BoundingBox(np.vstack(polys))
     # Set SVG viewbox to bounding box
@@ -63,20 +64,23 @@ def _simplify():
     #    poly = iterative_merge_simplify(poly, simpl_coefficient)
 
 
-def _render_single(name, shape, outname, color, objtype="country"):
+def _render_single(name, shape, outname, color, objtype="country", proj="merc"):
     try:
         # Create directory
         os.makedirs(os.path.dirname(outname), exist_ok=True)
         # Create SVG
-        dwg = svgwrite.Drawing(outfile, profile='full')
+        dwg = svgwrite.Drawing(outname, profile='full')
         # Render & save
-        draw_single_map(name, shape, outname, color, objtype=objtype)
+        polys = shape_to_polys(shape, proj=proj)
+        draw_single_map(dwg, name, polys, color, objtype=objtype)
         dwg.save()
         # Log
         print("Rendered {} to {}".format(name, outname))
         return True
     except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
         print("{} failed: {}".format(name, e))
+        traceback.print_tb(exc_traceback)
         return False
 
 def render_all_countries(pool, countries, directory, color, only=[]):
