@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 from collections import namedtuple
 import pyproj
-from ShapeTransform import *
-from Projections import *
-from ShapefileRecords import *
 import multiprocessing
 import svgwrite
 import functools
+import os
 import numpy as np
-from NaturalEarth import *
 from UliEngineering.Math.Geometry import *
 from UliEngineering.Math.Coordinates import *
 from UliEngineering.Utils.NumPy import *
 from UliEngineering.SignalProcessing.Selection import multiselect
+
+from .ShapeTransform import *
+from .Projections import *
+from .ShapefileRecords import *
+from .NaturalEarth import *
 
 def exportMapAsSVG(shape, outfile, simpl_ppm=1., proj="merc"):
     """
@@ -57,8 +59,8 @@ def exportMapAsSVG(shape, outfile, simpl_ppm=1., proj="merc"):
 
 def _render_country(args):
     try:
-        name, shape = args
-        exportMapAsSVG(shape, "SVG/{}.svg".format(name), 5)
+        name, shape, outname = args
+        exportMapAsSVG(shape, outname, 5)
         print("Rendered {}...".format(name))
         return True
     except Exception as e:
@@ -69,9 +71,11 @@ def _find_shape(countries, name):
     country = countries.by_name(name)[0]
     return countries.reader.shape(country.index)
 
-def render_all_countries(countries):
+def render_all_countries(countries, directory):
+    os.makedirs(directory, exist_ok=True)
     pool = multiprocessing.Pool(4)
-    args = [(name, _find_shape(countries, name)) for name in countries.names()]
+    args = [(name, _find_shape(countries, name), os.path.join(directory, name + ".svg"))
+            for name in countries.names()]
     pool.map(_render_country, args)
 
 def render_country(countries, name):
