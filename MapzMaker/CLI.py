@@ -32,8 +32,8 @@ def perform_render(args):
         # Render all types of structures
         futures = []
         futures += render_all_countries(pool, countries, svgdir, args.color)
-        futures += render_all_countries(pool, mapunits, svgdir, args.color)
-        futures += render_all_countries(pool, states, svgdir, args.color)
+        #futures += render_all_countries(pool, mapunits, svgdir, args.color)
+        futures += render_all_states(pool, countries, states, svgdir, args.color)
         concurrent.futures.wait(futures)
     else:
         raise NotImplementedError("Please use render --all for the moment")

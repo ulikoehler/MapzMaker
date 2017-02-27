@@ -39,7 +39,7 @@ def exportMapAsSVG(name, shape, outfile, color="#000", proj="merc"):
     normalize_coordinates_svg(points)
     # Find only polygons that are larger than a certain fraction
     # of the total area (i.e. remove tiny islands)
-    polys = filter_shapes_by_total_area_threshold(points, shape.parts[1:], 0.005)
+    polys = filter_shapes_by_total_area_threshold(points, shape.parts[1:], 0.001)
     # Compute bbox only from remaining points
     bbox = BoundingBox(np.vstack(polys))
     # Compute actual simplification coefficient based on bbox
@@ -57,27 +57,64 @@ def exportMapAsSVG(name, shape, outfile, color="#000", proj="merc"):
     dwg.save()
 
 
-def _render_country(name, shape, outname, color):
+def _render_single(name, shape, outname, color):
     try:
+        # Create directory
+        os.makedirs(os.path.dirname(outname), exist_ok=True)
+        # Render
         exportMapAsSVG(name, shape, outname, color)
-        print("Rendered {}".format(name))
+        print("Rendered {} to {}".format(name, outname))
         return True
     except Exception as e:
         print("{} failed: {}".format(name, e))
         return False
 
 def render_all_countries(pool, countries, directory, color):
+    """
+    Render country overviews
+    """
     futures = []
-    for name in countries.names():
-        country = countries.by_name(name)[0]
+    by_isoa2 = countries_by_isoa2(countries)
+    for isoa2, country in by_isoa2.items():
+        name = country.name
         shape = countries.reader.shape(country.index)
-        outname = os.path.join(directory, name + ".svg")
+        # Build outname & create directory
+        outname = os.path.join(directory, isoa2, "Country", name + ".svg")
         # Run asynchronously
-        futures.append(pool.submit(_render_country, name, shape, outname, color))
+        futures.append(pool.submit(_render_single, name, shape, outname, color))
+    return futures
+
+def render_all_states(pool, countries, states, directory, color):
+    """
+    Render states
+    """
+    # Build state map
+    states_by_isoa2 = states_by_country(states)
+    country_by_isoa2 = countries_by_isoa2(countries)
+
+    futures = []
+    for isoa2, country in country_by_isoa2.items():
+        name = country.name
+        try: name = country.name_long
+        except: pass
+        # Get states
+        if isoa2 not in states_by_isoa2:
+            continue
+        for state in states_by_isoa2[isoa2]:
+            shape = states.reader.shape(state.index)
+            statename = state.woe_name or state.name
+            if not statename:
+                print(state)
+                continue
+            # Build outname & create directory
+            outname = os.path.join(directory, isoa2, "States", statename + ".svg")
+            # Run asynchronously
+            futures.append(pool.submit(_render_single, statename, shape, outname, color))
+        # TODO: Render country with state overlay
     return futures
 
 def render_country(countries, directory, name):
     pool = multiprocessing.Pool(4)
     country = countries.by_name(name)[0]
     shape = _find_shape(countries, name)
-    _render_country(name, shape, os.path.join(directory, name + ".svg"))
+    _render_single(name, shape, os.path.join(directory, name + ".svg"))

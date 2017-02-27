@@ -3,6 +3,7 @@ import shapefile
 from UliEngineering.Utils.Files import *
 from UliEngineering.Utils.ZIP import *
 from toolz import itertoolz
+import operator
 
 def read_naturalearth_zip(filename):
     """
@@ -32,9 +33,19 @@ def countries_by_isoa2(countries):
         for country in countries.records
     }
 
+def countries_by_isoa3(countries):
+    """
+    A map of country ISO 3166-1 alpha-3
+    to the country record
+    """
+    return {
+        country.iso_a3: country
+        for country in countries.records
+    }
+
 
 def states_by_country(states):
     """
-    A list of states by country ISO 3166-1 alpha-2 code
+    A list of states by country ISO 3166-1 alpha-3 code
     """
     return itertoolz.groupby(operator.attrgetter("iso_a2"), states.records)
