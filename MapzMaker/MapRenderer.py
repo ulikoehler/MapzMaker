@@ -66,18 +66,18 @@ def _render_country(name, shape, outname, color):
         print("{} failed: {}".format(name, e))
         return False
 
-def _find_shape(countries, name):
-    country = countries.by_name(name)[0]
-    return countries.reader.shape(country.index)
-
 def render_all_countries(pool, countries, directory, color):
     futures = []
     for name in countries.names():
-        shape = _find_shape(countries, name)
+        country = countries.by_name(name)[0]
+        shape = countries.reader.shape(country.index)
         outname = os.path.join(directory, name + ".svg")
+        # Run asynchronously
         futures.append(pool.submit(_render_country, name, shape, outname, color))
     return futures
 
 def render_country(countries, directory, name):
     pool = multiprocessing.Pool(4)
-    _render_country(name, _find_shape(countries, name), os.path.join(directory, name + ".svg"))
+    country = countries.by_name(name)[0]
+    shape = _find_shape(countries, name)
+    _render_country(name, shape, os.path.join(directory, name + ".svg"))
