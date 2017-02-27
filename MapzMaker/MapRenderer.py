@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 from collections import namedtuple
+import concurrent.futures
 import pyproj
-import multiprocessing
 import svgwrite
 import functools
-import os
+import os.path
 import numpy as np
 from UliEngineering.Math.Geometry import *
 from UliEngineering.Math.Coordinates import *
@@ -16,7 +16,7 @@ from .Projections import *
 from .ShapefileRecords import *
 from .NaturalEarth import *
 
-def exportMapAsSVG(name, shape, outfile, simpl_ppm=1., proj="merc"):
+def exportMapAsSVG(name, shape, outfile, color="#000", proj="merc"):
     """
     Parameters
     ----------
@@ -44,7 +44,7 @@ def exportMapAsSVG(name, shape, outfile, simpl_ppm=1., proj="merc"):
     bbox = BoundingBox(np.vstack(polys))
     # Compute actual simplification coefficient based on bbox
     # NOTE: bbox area is NOT actual area due to normalization
-    simpl_coefficient = simpl_ppm * bbox.area / 1e6
+    #simpl_coefficient = simpl_ppm * bbox.area / 1e6
     # Set SVG viewbox to bounding box
     dwg.viewbox(width=bbox.width, height=bbox.height)
     # Draw all polygons
@@ -52,15 +52,14 @@ def exportMapAsSVG(name, shape, outfile, simpl_ppm=1., proj="merc"):
         # Draw to SVG
         #if simpl_coefficient != 0:
         #    poly = iterative_merge_simplify(poly, simpl_coefficient)
-        dwg.add(svgwrite.shapes.Polygon(poly, class_="country-" +\
-            name.lower().replace(" ", "-").replace(".", "")))
+        dwg.add(svgwrite.shapes.Polygon(poly, fill=color,
+            class_="country-" + name.lower().replace(" ", "-").replace(".", "")))
     dwg.save()
 
 
-def _render_country(args):
+def _render_country(name, shape, outname, color):
     try:
-        name, shape, outname = args
-        exportMapAsSVG(name, shape, outname, 5)
+        exportMapAsSVG(name, shape, outname, color)
         print("Rendered {}...".format(name))
         return True
     except Exception as e:
@@ -71,13 +70,15 @@ def _find_shape(countries, name):
     country = countries.by_name(name)[0]
     return countries.reader.shape(country.index)
 
-def render_all_countries(countries, directory):
-    os.makedirs(directory, exist_ok=True)
-    pool = multiprocessing.Pool(4)
-    args = [(name, _find_shape(countries, name), os.path.join(directory, name + ".svg"))
-            for name in countries.names()]
-    pool.map(_render_country, args)
+def render_all_countries(countries, directory, color, concurrency=4):
+    pool = concurrent.futures.ProcessPoolExecutor(concurrency)
+    futures = []
+    for name in countries.names():
+        shape = _find_shape(countries, name)
+        outname = os.path.join(directory, name + ".svg")
+        futures.append(pool.submit(_render_country, name, shape, outname, color))
+    concurrent.futures.wait(futures)
 
-def render_country(countries, name):
+def render_country(countries, directory, name):
     pool = multiprocessing.Pool(4)
-    _render_country(countries, countries.names())
+    _render_country(name, _find_shape(countries, name), os.path.join(directory, name + ".svg"))
