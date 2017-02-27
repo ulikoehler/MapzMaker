@@ -53,14 +53,14 @@ def exportMapAsSVG(name, shape, outfile, color="#000", proj="merc"):
         #if simpl_coefficient != 0:
         #    poly = iterative_merge_simplify(poly, simpl_coefficient)
         dwg.add(svgwrite.shapes.Polygon(poly, fill=color,
-            class_="country-" + name.lower().replace(" ", "-").replace(".", "")))
+            class_="country-" + name.lower().replace(" ", "-").replace(".", "").replace("(","").replace(")","")))
     dwg.save()
 
 
 def _render_country(name, shape, outname, color):
     try:
         exportMapAsSVG(name, shape, outname, color)
-        print("Rendered {}...".format(name))
+        print("Rendered {}".format(name))
         return True
     except Exception as e:
         print("{} failed: {}".format(name, e))
@@ -70,14 +70,13 @@ def _find_shape(countries, name):
     country = countries.by_name(name)[0]
     return countries.reader.shape(country.index)
 
-def render_all_countries(countries, directory, color, concurrency=4):
-    pool = concurrent.futures.ProcessPoolExecutor(concurrency)
+def render_all_countries(pool, countries, directory, color):
     futures = []
     for name in countries.names():
         shape = _find_shape(countries, name)
         outname = os.path.join(directory, name + ".svg")
         futures.append(pool.submit(_render_country, name, shape, outname, color))
-    concurrent.futures.wait(futures)
+    return futures
 
 def render_country(countries, directory, name):
     pool = multiprocessing.Pool(4)

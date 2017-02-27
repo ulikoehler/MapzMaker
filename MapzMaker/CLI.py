@@ -21,13 +21,20 @@ def perform_render(args):
         print("Use either --all or specify at least one country")
         parser.print_help()
         sys.exit(1)
-    # Map
     os.makedirs(svgdir, exist_ok=True)
-    countries = RecordSet(read_naturalearth_zip("ne_10m_admin_0_map_units.zip"))
+    # Read data
+    countries = RecordSet(read_naturalearth_zip("ne_10m_admin_0_countries.zip"))
+    mapunits = RecordSet(read_naturalearth_zip("ne_10m_admin_0_map_units.zip"))
     states = RecordSet(read_naturalearth_zip("ne_10m_admin_1_states_provinces.zip"))
 
     if args.all:
-        render_all_countries(countries, svgdir, args.color, concurrency=args.parallel)
+        pool = concurrent.futures.ProcessPoolExecutor(args.parallel)
+        # Render all types of structures
+        futures = []
+        futures += render_all_countries(pool, countries, svgdir, args.color)
+        futures += render_all_countries(pool, mapunits, svgdir, args.color)
+        futures += render_all_countries(pool, states, svgdir, args.color)
+        concurrent.futures.wait(futures)
     else:
         raise NotImplementedError("Please use render --all for the moment")
 
@@ -70,6 +77,8 @@ def download_all():
         urlprefix + "ne_10m_admin_1_states_provinces.zip")
     download_if_not_exists("ne_10m_populated_places.zip",
         urlprefix + "ne_10m_populated_places.zip")
+    download_if_not_exists("ne_10m_admin_0_countries.zip",
+        urlprefix + "ne_10m_admin_0_countries.zip")
 
 if __name__ == "__main__":
     import argparse
