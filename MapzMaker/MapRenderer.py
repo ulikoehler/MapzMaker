@@ -16,7 +16,7 @@ from .Projections import *
 from .ShapefileRecords import *
 from .NaturalEarth import *
 
-def exportMapAsSVG(shape, outfile, simpl_ppm=1., proj="merc"):
+def exportMapAsSVG(name, shape, outfile, simpl_ppm=1., proj="merc"):
     """
     Parameters
     ----------
@@ -50,17 +50,17 @@ def exportMapAsSVG(shape, outfile, simpl_ppm=1., proj="merc"):
     # Draw all polygons
     for poly in polys:
         # Draw to SVG
-        # Low quality: 1. Medium quality: .2  High quality: .05 Ultra-high: .01
-        if simpl_coefficient != 0:
-            poly = iterative_merge_simplify(poly, simpl_coefficient)
-        dwg.add(svgwrite.shapes.Polygon(poly))
+        #if simpl_coefficient != 0:
+        #    poly = iterative_merge_simplify(poly, simpl_coefficient)
+        dwg.add(svgwrite.shapes.Polygon(poly, class_="country-" +\
+            name.lower().replace(" ", "-").replace(".", "")))
     dwg.save()
 
 
 def _render_country(args):
     try:
         name, shape, outname = args
-        exportMapAsSVG(shape, outname, 5)
+        exportMapAsSVG(name, shape, outname, 5)
         print("Rendered {}...".format(name))
         return True
     except Exception as e:
