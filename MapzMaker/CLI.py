@@ -32,11 +32,11 @@ def perform_render(args):
 
     if args.all:
         # Render all types of structures
-        futures += render_all_countries(pool, countries, svgdir, args.color)
+        f#utures += render_all_countries(pool, countries, svgdir, args.color)
         #futures += render_all_countries(pool, mapunits, svgdir, args.color)
         futures += render_all_states(pool, countries, states, svgdir, args.color)
     else:
-        futures += render_all_countries(pool, countries, svgdir, args.color, only=args.country)
+        #futures += render_all_countries(pool, countries, svgdir, args.color, only=args.country)
         futures += render_all_states(pool, countries, states, svgdir, args.color, only=args.country)
     concurrent.futures.wait(futures)
 

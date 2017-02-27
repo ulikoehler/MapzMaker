@@ -164,13 +164,13 @@ def iterative_merge_simplify(poly, threshold, nlimit=16, stopdiff=1):
             break
     return poly
             
-def normalize_coordinates_svg(points):
+def normalize_coordinates_svg(points, bbox):
     """
     Normalize coordinates to 0,0 origin & coordinate scale
-    which is suitable for SVG rendering
-    operates in-place
+    which is suitable for SVG rendering.
+    Uses bbox as reference bounding box.
+    Operates in-place.
     """
-    bbox = BoundingBox(points)
     # Substract bounding box (one bbox corner := (0,0))
     points[:,0] -= bbox.minx
     points[:,1] -= bbox.miny

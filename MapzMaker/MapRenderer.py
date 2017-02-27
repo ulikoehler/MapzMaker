@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 from collections import namedtuple
 import concurrent.futures
-from toolz import dicttoolz
+from toolz import dicttoolz, itertoolz, functoolz
+from slugify import slugify
 import pyproj
 import svgwrite
 import functools
@@ -19,30 +20,52 @@ from .Projections import *
 from .ShapefileRecords import *
 from .NaturalEarth import *
 
-def shape_to_polys(shape, proj="merc"):
+def shape_to_polys(shape, ref_bbox=None, filter_area_thresh=.001, proj="merc"):
     points = np.asarray(shape.points.copy())
     # Mirror by X axis
     # as lower latitude represent more southern coords (in contrast to SVG)
     points[:,1] *= -1
     points = project_array(points, dstp=proj)
+    # Compute reference bounding box if not using external reference
+    if ref_bbox is None:
+        ref_bbox = BoundingBox(points)
     # Various coordinate normalization
-    normalize_coordinates_svg(points)
+    normalize_coordinates_svg(points, bbox=ref_bbox)
     # Find only polygons that are larger than a certain fraction
     # of the total area (i.e. remove tiny islands)
-    polys = filter_shapes_by_total_area_threshold(points, shape.parts[1:], 0.001)
-    return polys
+    polys = filter_shapes_by_total_area_threshold(points, shape.parts[1:], filter_area_thresh)
+    return polys, ref_bbox
 
-def draw_single_map(dwg, name, polys, color="#000", objtype="country"):
+def _set_viewbox(dwg, polys):
+    """
+    Set the viewbox from polygons
+    """
     # Compute bbox only from remaining points
     bbox = BoundingBox(np.vstack(polys))
     # Set SVG viewbox to bounding box
     dwg.viewbox(width=bbox.width, height=bbox.height)
+
+def __draw_to_svg(dwg, poly, name, color, objtype):
+    dwg.add(svgwrite.shapes.Polygon(poly, fill=color,
+        class_="{}-{}".format(objtype, slugify(name))))
+
+def draw_single_map(dwg, name, polys, color="#000", objtype="country"):
+    _set_viewbox(dwg, polys)
     # Draw all polygons
     for poly in polys:
         # Draw to SVG
-        dwg.add(svgwrite.shapes.Polygon(poly, fill=color,
-            class_="{}-{}".format(objtype,
-                name.lower().replace(" ", "-").replace(".", "").replace("(","").replace(")",""))))
+        __draw_to_svg(dwg, poly, name, color, objtype)
+
+def draw_country_state_map(dwg, name, country_polys, state_polymap, color1="#000", color2="#fff"):
+    # Draw the country
+    for poly in country_polys:
+        # Draw to SVG
+        __draw_to_svg(dwg, poly, name, color1, "country")
+    # Draw the states
+    for statename, state in state_polymap.items(): # Each state might have multiple polys
+        for poly in state:
+            # Draw to SVG
+            __draw_to_svg(dwg, poly, statename, color2, "state")
 
 def _simplify():
     """
@@ -70,8 +93,9 @@ def _render_single(name, shape, outname, color, objtype="country", proj="merc"):
         os.makedirs(os.path.dirname(outname), exist_ok=True)
         # Create SVG
         dwg = svgwrite.Drawing(outname, profile='full')
+        # Preprocess shape
+        polys, _ = shape_to_polys(shape, proj=proj)
         # Render & save
-        polys = shape_to_polys(shape, proj=proj)
         draw_single_map(dwg, name, polys, color, objtype=objtype)
         dwg.save()
         # Log
@@ -83,25 +107,30 @@ def _render_single(name, shape, outname, color, objtype="country", proj="merc"):
         traceback.print_tb(exc_traceback)
         return False
 
-def render_all_countries(pool, countries, directory, color, only=[]):
-    """
-    Render country overviews
-    """
-    by_isoa2 = countries_by_isoa2(countries)
-    # Apply only filter
-    if only:
-        by_isoa2 = dicttoolz.keyfilter(
-            lambda k: k in only, by_isoa2)
-
-    futures = []
-    for isoa2, country in by_isoa2.items():
-        name = country.name
-        shape = countries.reader.shape(country.index)
-        # Build outname & create directory
-        outname = os.path.join(directory, isoa2, "Country", name + ".svg")
-        # Run asynchronously
-        futures.append(pool.submit(_render_single, name, shape, outname, color, "country"))
-    return futures
+def _render_state_overlay(name, country_shape, subshape_map, outname, color, proj="merc"):
+    try:
+        # Create directory
+        os.makedirs(os.path.dirname(outname), exist_ok=True)
+        # Create SVG
+        dwg = svgwrite.Drawing(outname, profile='full')
+        # Preprocess shapes
+        country_polys, bbox = shape_to_polys(country_shape, proj=proj)
+        subpolymap = dicttoolz.valmap(
+                lambda shape: shape_to_polys(
+                    shape, proj=proj, ref_bbox=bbox)[0], subshape_map)
+        # Render & save
+        draw_country_state_map(dwg, name, country_polys, subpolymap, color, color)
+        # Set viewbox
+        _set_viewbox(dwg, country_polys)
+        dwg.save()
+        # Log
+        print("Rendered state overlay for {} to {}".format(name, outname))
+        return True
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        print("{} failed: {}".format(name, e))
+        traceback.print_tb(exc_traceback)
+        return False
 
 def render_all_states(pool, countries, states, directory, color, only=[]):
     """
@@ -117,23 +146,40 @@ def render_all_states(pool, countries, states, directory, color, only=[]):
 
     futures = []
     for isoa2, country in country_by_isoa2.items():
-        name = country.name
-        try: name = country.name_long
+        #
+        # Render country name
+        #
+        countryname = country.name
+        try: countryname = country.name_long
         except: pass
+        countryshape = countries.reader.shape(country.index)
+        outname = os.path.join(directory, isoa2, "Country", countryname + ".svg")
+        futures.append(pool.submit(_render_single, countryname, countryshape, outname, color, "country"))
         # Get states
         if isoa2 not in states_by_isoa2:
             continue
+        statemap = {}
+        #
+        # Render individual states
+        #
         for state in states_by_isoa2[isoa2]:
-            shape = states.reader.shape(state.index)
+            stateshape = states.reader.shape(state.index)
             statename = state.woe_name or state.name
             if not statename:
                 print(state)
                 continue
+            # Add to statemap for later combined rendering
+            statemap[statename] = stateshape
             # Build outname & create directory
             outname = os.path.join(directory, isoa2, "States", statename + ".svg")
-            # Run asynchronously
-            futures.append(pool.submit(_render_single, statename, shape, outname, color, "state"))
-        # TODO: Render country with state overlay
+            # Render state asynchronously
+            futures.append(pool.submit(_render_single, statename, stateshape, outname, color, "state"))
+        #
+        # Render country with state overlay
+        #
+        outname = os.path.join(directory, isoa2, "Country", countryname + ".states.svg")
+        futures.append(pool.submit(_render_state_overlay,
+            countryname, countryshape, statemap, outname, color))
     return futures
 
 def render_country(countries, directory, name):

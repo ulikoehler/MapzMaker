@@ -3,3 +3,4 @@ python-slugify
 pyshp
 svgwrite
 bs4
+toolz
