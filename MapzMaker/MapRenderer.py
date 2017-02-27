@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from collections import namedtuple
 import concurrent.futures
+from toolz import dicttoolz
 import pyproj
 import svgwrite
 import functools
@@ -16,7 +17,7 @@ from .Projections import *
 from .ShapefileRecords import *
 from .NaturalEarth import *
 
-def exportMapAsSVG(name, shape, outfile, color="#000", proj="merc"):
+def exportMapAsSVG(name, shape, outfile, color="#000", proj="merc", objtype="country"):
     """
     Parameters
     ----------
@@ -53,44 +54,54 @@ def exportMapAsSVG(name, shape, outfile, color="#000", proj="merc"):
         #if simpl_coefficient != 0:
         #    poly = iterative_merge_simplify(poly, simpl_coefficient)
         dwg.add(svgwrite.shapes.Polygon(poly, fill=color,
-            class_="country-" + name.lower().replace(" ", "-").replace(".", "").replace("(","").replace(")","")))
+            class_="{}-{}".format(objtype,
+                name.lower().replace(" ", "-").replace(".", "").replace("(","").replace(")",""))))
     dwg.save()
 
 
-def _render_single(name, shape, outname, color):
+def _render_single(name, shape, outname, color, objtype="country"):
     try:
         # Create directory
         os.makedirs(os.path.dirname(outname), exist_ok=True)
         # Render
-        exportMapAsSVG(name, shape, outname, color)
+        exportMapAsSVG(name, shape, outname, color, objtype=objtype)
         print("Rendered {} to {}".format(name, outname))
         return True
     except Exception as e:
         print("{} failed: {}".format(name, e))
         return False
 
-def render_all_countries(pool, countries, directory, color):
+def render_all_countries(pool, countries, directory, color, only=[]):
     """
     Render country overviews
     """
-    futures = []
     by_isoa2 = countries_by_isoa2(countries)
+    # Apply only filter
+    if only:
+        by_isoa2 = dicttoolz.keyfilter(
+            lambda k: k in only, by_isoa2)
+
+    futures = []
     for isoa2, country in by_isoa2.items():
         name = country.name
         shape = countries.reader.shape(country.index)
         # Build outname & create directory
         outname = os.path.join(directory, isoa2, "Country", name + ".svg")
         # Run asynchronously
-        futures.append(pool.submit(_render_single, name, shape, outname, color))
+        futures.append(pool.submit(_render_single, name, shape, outname, color, "country"))
     return futures
 
-def render_all_states(pool, countries, states, directory, color):
+def render_all_states(pool, countries, states, directory, color, only=[]):
     """
     Render states
     """
     # Build state map
     states_by_isoa2 = states_by_country(states)
     country_by_isoa2 = countries_by_isoa2(countries)
+    # Apply only filter
+    if only:
+        country_by_isoa2 = dicttoolz.keyfilter(
+            lambda k: k in only, country_by_isoa2)
 
     futures = []
     for isoa2, country in country_by_isoa2.items():
@@ -109,7 +120,7 @@ def render_all_states(pool, countries, states, directory, color):
             # Build outname & create directory
             outname = os.path.join(directory, isoa2, "States", statename + ".svg")
             # Run asynchronously
-            futures.append(pool.submit(_render_single, statename, shape, outname, color))
+            futures.append(pool.submit(_render_single, statename, shape, outname, color, "state"))
         # TODO: Render country with state overlay
     return futures
 

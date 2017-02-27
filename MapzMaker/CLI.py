@@ -27,16 +27,18 @@ def perform_render(args):
     mapunits = RecordSet(read_naturalearth_zip("ne_10m_admin_0_map_units.zip"))
     states = RecordSet(read_naturalearth_zip("ne_10m_admin_1_states_provinces.zip"))
 
+    pool = concurrent.futures.ProcessPoolExecutor(args.parallel)
+    futures = []
+
     if args.all:
-        pool = concurrent.futures.ProcessPoolExecutor(args.parallel)
         # Render all types of structures
-        futures = []
         futures += render_all_countries(pool, countries, svgdir, args.color)
         #futures += render_all_countries(pool, mapunits, svgdir, args.color)
         futures += render_all_states(pool, countries, states, svgdir, args.color)
-        concurrent.futures.wait(futures)
     else:
-        raise NotImplementedError("Please use render --all for the moment")
+        futures += render_all_countries(pool, countries, svgdir, args.color, only=args.country)
+        futures += render_all_states(pool, countries, states, svgdir, args.color, only=args.country)
+    concurrent.futures.wait(futures)
 
 def rasterize_single(filename, directory, width):
     fileprefix, ext = os.path.splitext(filename)
