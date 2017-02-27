@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
 from ansicolor import blue, red, black
-from .Download import download_if_not_exists
-from .NaturalEarth import *
-from .ShapefileRecords import *
-from .MapRenderer import *
-from .Rasterizer import *
 import sys
 import os
 import os.path
 import concurrent.futures
 
-urlprefix = "http://www.naturalearthdata.com/http//www.naturalearthdata.com/download/10m/cultural/"
-
 def perform_render(args):
+    from .ShapefileRecords import RecordSet
+    from .NaturalEarth import read_naturalearth_zip
+    from .MapRenderer import render_all_states
     # Download natural earth data if not present
-    download_all()
+    check_download_all()
 
     svgdir = os.path.join(args.outdir, "SVG")
     if not args.all and not args.country:
@@ -32,11 +28,8 @@ def perform_render(args):
 
     if args.all:
         # Render all types of structures
-        f#utures += render_all_countries(pool, countries, svgdir, args.color)
-        #futures += render_all_countries(pool, mapunits, svgdir, args.color)
         futures += render_all_states(pool, countries, states, svgdir, args.color)
     else:
-        #futures += render_all_countries(pool, countries, svgdir, args.color, only=args.country)
         futures += render_all_states(pool, countries, states, svgdir, args.color, only=args.country)
     concurrent.futures.wait(futures)
 
@@ -49,6 +42,7 @@ def rasterize_single(filename, directory, width):
 
 
 def perform_rasterize(args):
+    from .Rasterizer import rasterize_svg
     # Check args
     if not args.all and not args.country:
         print("Use either --all or specify at least one country")
@@ -71,16 +65,20 @@ def perform_rasterize(args):
         for file in args.country:
             rasterize_single(file, args.outdir, width)
 
-def download_all():
+def check_download_all():
+    files = ["ne_10m_admin_0_map_units.zip",
+             "ne_10m_admin_1_states_provinces.zip",
+             "ne_10m_populated_places.zip",
+             "ne_10m_admin_0_countries.zip"]
+    if not all([os.path.exists(file) for file in files]):
+        download_all(files)
+
+def download_all(files):
+    from .Download import download_file
+    urlprefix = "http://www.naturalearthdata.com/http//www.naturalearthdata.com/download/10m/cultural/"
     print(blue("Downloading Natural Earth files...", bold=True))
-    download_if_not_exists("ne_10m_admin_0_map_units.zip",
-        urlprefix + "ne_10m_admin_0_map_units.zip")
-    download_if_not_exists("ne_10m_admin_1_states_provinces.zip",
-        urlprefix + "ne_10m_admin_1_states_provinces.zip")
-    download_if_not_exists("ne_10m_populated_places.zip",
-        urlprefix + "ne_10m_populated_places.zip")
-    download_if_not_exists("ne_10m_admin_0_countries.zip",
-        urlprefix + "ne_10m_admin_0_countries.zip")
+    for file in files:
+        download_file(file, urlprefix + file)
 
 def mapzmaker_cli():
     import argparse
