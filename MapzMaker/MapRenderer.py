@@ -17,7 +17,33 @@ from .Projections import *
 from .ShapefileRecords import *
 from .NaturalEarth import *
 
-def exportMapAsSVG(name, shape, outfile, color="#000", proj="merc", objtype="country"):
+def shape_to_polys(shape, bbox):
+    points = np.asarray(shape.points.copy())
+    # Mirror by X axis
+    # as lower latitude represent more southern coords (in contrast to SVG)
+    points[:,1] *= -1
+    points = project_array(points, dstp=proj)
+    # Various coordinate normalization
+    normalize_coordinates_svg(points)
+    # Find only polygons that are larger than a certain fraction
+    # of the total area (i.e. remove tiny islands)
+    polys = filter_shapes_by_total_area_threshold(points, shape.parts[1:], 0.001)
+    return poly
+
+def draw_single_map(dwg, name, polys, outfile, color="#000", proj="merc", objtype="country"):
+    polys = shape_to_polys(shape)
+    # Compute bbox only from remaining points
+    bbox = BoundingBox(np.vstack(polys))
+    # Set SVG viewbox to bounding box
+    dwg.viewbox(width=bbox.width, height=bbox.height)
+    # Draw all polygons
+    for poly in polys:
+        # Draw to SVG
+        dwg.add(svgwrite.shapes.Polygon(poly, fill=color,
+            class_="{}-{}".format(objtype,
+                name.lower().replace(" ", "-").replace(".", "").replace("(","").replace(")",""))))
+
+def _simplify():
     """
     Parameters
     ----------
@@ -30,41 +56,23 @@ def exportMapAsSVG(name, shape, outfile, color="#000", proj="merc", objtype="cou
         Ultra-high quality: 1
         Full quality: 0 (no simplificatio)
     """
-    dwg = svgwrite.Drawing(outfile, profile='full')
-    points = np.asarray(shape.points.copy())
-    # Mirror by X axis
-    # as lower latitude represent more southern coords (in contrast to SVG)
-    points[:,1] *= -1
-    points = project_array(points, dstp=proj)
-    # Various coordinate normalization
-    normalize_coordinates_svg(points)
-    # Find only polygons that are larger than a certain fraction
-    # of the total area (i.e. remove tiny islands)
-    polys = filter_shapes_by_total_area_threshold(points, shape.parts[1:], 0.001)
-    # Compute bbox only from remaining points
-    bbox = BoundingBox(np.vstack(polys))
     # Compute actual simplification coefficient based on bbox
     # NOTE: bbox area is NOT actual area due to normalization
     #simpl_coefficient = simpl_ppm * bbox.area / 1e6
-    # Set SVG viewbox to bounding box
-    dwg.viewbox(width=bbox.width, height=bbox.height)
-    # Draw all polygons
-    for poly in polys:
-        # Draw to SVG
-        #if simpl_coefficient != 0:
-        #    poly = iterative_merge_simplify(poly, simpl_coefficient)
-        dwg.add(svgwrite.shapes.Polygon(poly, fill=color,
-            class_="{}-{}".format(objtype,
-                name.lower().replace(" ", "-").replace(".", "").replace("(","").replace(")",""))))
-    dwg.save()
+    #if simpl_coefficient != 0:
+    #    poly = iterative_merge_simplify(poly, simpl_coefficient)
 
 
 def _render_single(name, shape, outname, color, objtype="country"):
     try:
         # Create directory
         os.makedirs(os.path.dirname(outname), exist_ok=True)
-        # Render
-        exportMapAsSVG(name, shape, outname, color, objtype=objtype)
+        # Create SVG
+        dwg = svgwrite.Drawing(outfile, profile='full')
+        # Render & save
+        draw_single_map(name, shape, outname, color, objtype=objtype)
+        dwg.save()
+        # Log
         print("Rendered {} to {}".format(name, outname))
         return True
     except Exception as e:

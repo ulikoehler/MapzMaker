@@ -1,0 +1,5 @@
+numpy
+python-slugify
+pyshp
+svgwrite
+bs4

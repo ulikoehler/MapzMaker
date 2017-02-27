@@ -82,7 +82,7 @@ def download_all():
     download_if_not_exists("ne_10m_admin_0_countries.zip",
         urlprefix + "ne_10m_admin_0_countries.zip")
 
-if __name__ == "__main__":
+def mapzmaker_cli():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('-o', '--outdir', default="output", help='Output directory')
