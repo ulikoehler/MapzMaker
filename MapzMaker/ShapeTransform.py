@@ -178,3 +178,24 @@ def normalize_coordinates_svg(points, bbox):
     # Scale to avoid huuuuge coordinates
     # due to the projection mechanics of pyproj
     points *= 100. / bbox.max_dim
+
+def simplify(poly, ppm=1.):
+    """
+    Parameters
+    ----------
+    simpl_ppm : float
+        The polyon simplification factor expressed in ppm
+        of the bounding box size.
+        Low quality: 100
+        Medium quality: 20
+        High quality: 5
+        Ultra-high quality: 1
+        Full quality: 0 (no simplificatio)
+    """
+    bbox = BoundingBox(poly)
+    # Compute actual simplification coefficient based on bbox
+    # NOTE: bbox area is NOT actual area due to normalization
+    simpl_coefficient = ppm * bbox.area / 1e6
+    if simpl_coefficient != 0:
+        poly = iterative_merge_simplify(poly, simpl_coefficient)
+    return poly

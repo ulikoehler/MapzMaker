@@ -73,6 +73,9 @@ def check_download_all():
     if not all([os.path.exists(file) for file in files]):
         download_all(files)
 
+def perform_highlight():
+    highlight_svg
+
 def download_all(files):
     from .Download import download_file
     urlprefix = "http://www.naturalearthdata.com/http//www.naturalearthdata.com/download/10m/cultural/"

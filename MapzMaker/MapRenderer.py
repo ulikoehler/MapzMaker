@@ -67,24 +67,6 @@ def draw_country_state_map(dwg, name, country_polys, state_polymap, color1="#000
             # Draw to SVG
             __draw_to_svg(dwg, poly, statename, color2, "state")
 
-def _simplify():
-    """
-    Parameters
-    ----------
-    simpl_ppm : float
-        The polyon simplification factor expressed in ppm
-        of the bounding box size.
-        Low quality: 100
-        Medium quality: 20
-        High quality: 5
-        Ultra-high quality: 1
-        Full quality: 0 (no simplificatio)
-    """
-    # Compute actual simplification coefficient based on bbox
-    # NOTE: bbox area is NOT actual area due to normalization
-    #simpl_coefficient = simpl_ppm * bbox.area / 1e6
-    #if simpl_coefficient != 0:
-    #    poly = iterative_merge_simplify(poly, simpl_coefficient)
 
 
 def _render_single(name, shape, outname, color, objtype="country", proj="merc"):
