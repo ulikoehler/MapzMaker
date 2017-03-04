@@ -6,7 +6,7 @@ import glob
 import os.path
 import concurrent.futures
 
-def perform_render(args):
+def perform_render(parser, args):
     from .ShapefileRecords import RecordSet
     from .NaturalEarth import read_naturalearth_zip
     from .MapRenderer import render_all_states
@@ -34,15 +34,7 @@ def perform_render(args):
         futures += render_all_states(pool, countries, states, svgdir, args.color, only=args.country)
     concurrent.futures.wait(futures)
 
-def rasterize_single(filename, directory, width):
-    fileprefix, ext = os.path.splitext(filename)
-    svg = os.path.join(directory, "SVG", filename)
-    png = os.path.join(directory, "PNG-{}/{}.png".format(width, fileprefix))
-    rasterize_svg(svg, png, width)
-    print ("Rasterizing {} to {}...".format(filename, png))
-
-
-def perform_rasterize(args):
+def perform_rasterize(parser, args):
     from .Rasterizer import rasterize_svg
     # Check args
     if not args.all and not args.country:
@@ -54,17 +46,33 @@ def perform_rasterize(args):
     pngdir = os.path.join(args.directory, "PNG-{}".format(width))
     os.makedirs(pngdir, exist_ok=True)
 
-    if args.all:
-        files = os.listdir(os.path.join(args.directory, "SVG"))
-        # Assume we'll rasterize a lot
-        pool = concurrent.futures.ThreadPoolExecutor(5) # Don't care about GILs
-        futures = []
-        for file in files:
-            futures.append(pool.submit(rasterize_single, file, args.directory, width))
-        concurrent.futures.wait(futures)
-    else:
-        for file in args.country:
-            rasterize_single(file, args.directory, width)
+    # Assume we'll rasterize a lot
+    # GIL can be ignored, because we're rasterizing using subprocess (inkscape)
+    pool = concurrent.futures.ThreadPoolExecutor(args.parallel) # Don't care about GILs
+    futures = []
+
+    svgdir = os.path.join(args.directory, "SVG")
+    pngdir = os.path.join(args.directory, "PNG.{}".format(width))
+    for dirpath, subdirs, filenames in os.walk(svgdir):
+        relpath = os.path.relpath(dirpath, svgdir)
+        # Check country filter
+        country = os.path.split(relpath)[0]
+        if not args.all and country not in args.country:
+            continue
+        for filename in filenames:
+            canonical, ext = os.path.splitext(filename)
+            # Only handle SVGs
+            if ext.lower() != ".svg":
+                continue
+            # Build input/output paths
+            svgpath = os.path.join(dirpath, filename)
+            pngpath = os.path.join(pngdir, relpath, canonical + ".png")
+            # Create directory tree
+            os.makedirs(os.path.dirname(pngpath), exist_ok=True)
+            print("Rasterizing to {}".format(pngpath))
+            # Rasterize async
+            futures.append(pool.submit(rasterize_svg, svgpath, pngpath, width))
+    concurrent.futures.wait(futures)
 
 def check_download_all():
     files = ["ne_10m_admin_0_map_units.zip",
@@ -74,7 +82,7 @@ def check_download_all():
     if not all([os.path.exists(file) for file in files]):
         download_all(files)
 
-def perform_highlight(args):
+def perform_highlight(parser, args):
     from .SVGRestyle import highlight_svg
     svgglob = os.path.join(args.directory, "SVG", args.country, "Country", "*.states.svg")
     svgglob_result = glob.glob(svgglob)
@@ -120,4 +128,4 @@ def mapzmaker_cli():
         print("No command given (try using render)")
         parser.print_help()
         sys.exit(0)
-    args.func(args)
+    args.func(parser, args)
