@@ -9,10 +9,10 @@ from slugify import slugify
 
 def soup_from_svg(filename):
     with open(filename) as infile:
-        soup = BeautifulSoup(infile, "xml")
+        return BeautifulSoup(infile, "xml")
 
 def soup_to_svg(soup, filename):
-    with open(filename, "w") as outfile:
+    with open(filename, "wb") as outfile:
         outfile.write(soup.prettify("utf-8"))
 
 def parse_poly(attr):
@@ -25,7 +25,7 @@ def parse_attrmap(attrdefs):
         attrmap[slugify(name)] = attr
     return attrmap
 
-def highlight_svg(infile, outfile, coldefs)
+def highlight_svg(infile, outfile, coldefs):
     soup = soup_from_svg(infile)
     colormap = parse_attrmap(coldefs)
     # Process all polygons
