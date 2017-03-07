@@ -35,9 +35,9 @@ def perform_render(parser, args):
 
     if args.all:
         # Render all types of structures
-        futures += render_all_states(pool, countries, states, svgdir, stylemap)
+        futures += render_all_states(pool, countries, states, svgdir, stylemap, area_filter_ppm=args.area_filter)
     else:
-        futures += render_all_states(pool, countries, states, svgdir, stylemap, only=args.country)
+        futures += render_all_states(pool, countries, states, svgdir, stylemap, only=args.country, area_filter_ppm=args.area_filter)
     concurrent.futures.wait(futures)
 
 def perform_rasterize(parser, args):
@@ -116,6 +116,7 @@ def mapzmaker_cli():
     render.add_argument('-f', '--fill', default="#000", help='HTML color code for SVG, or \'none\'')
     render.add_argument('-s', '--stroke', default="none", help='HTML stroke color code for SVG')
     render.add_argument('-w', '--stroke-width', default="1", help='Stroke width for the outline')
+    render.add_argument('--area-filter', type=float, default=5000., help='Minimum PPM of the total area a subshape has to have in order to be included')
     render.set_defaults(func=perform_render)
     # Render
     render = subparsers.add_parser("rasterize")

@@ -20,7 +20,7 @@ from .Projections import *
 from .ShapefileRecords import *
 from .NaturalEarth import *
 
-def shape_to_polys(shape, ref_bbox=None, filter_area_thresh=.01, proj="merc"):
+def shape_to_polys(shape, ref_bbox=None, filter_area_thresh=.001, proj="merc"):
     points = np.asarray(shape.points.copy())
     # Mirror by X axis
     # as lower latitude represent more southern coords (in contrast to SVG)
@@ -70,14 +70,14 @@ def draw_country_state_map(dwg, name, country_polys, state_polymap, stylemap1, s
 
 
 
-def _render_single(name, shape, outname, stylemap, objtype="country", proj="merc"):
+def _render_single(name, shape, outname, stylemap, objtype="country", proj="merc", area_filter_ppm=5000):
     try:
         # Create directory
         os.makedirs(os.path.dirname(outname), exist_ok=True)
         # Create SVG
         dwg = svgwrite.Drawing(outname, profile='full')
         # Preprocess shape
-        polys, _ = shape_to_polys(shape, proj=proj)
+        polys, _ = shape_to_polys(shape, proj=proj, filter_area_thresh=area_filter_ppm / 1e6)
         # Render & save
         draw_single_map(dwg, name, polys, stylemap, objtype=objtype)
         dwg.save()
@@ -90,7 +90,7 @@ def _render_single(name, shape, outname, stylemap, objtype="country", proj="merc
         traceback.print_tb(exc_traceback)
         return False
 
-def _render_state_overlay(name, country_shape, subshape_map, outname, stylemap, proj="merc"):
+def _render_state_overlay(name, country_shape, subshape_map, outname, stylemap, proj="merc", area_filter_ppm=5000):
     try:
         # Create directory
         os.makedirs(os.path.dirname(outname), exist_ok=True)
@@ -115,7 +115,7 @@ def _render_state_overlay(name, country_shape, subshape_map, outname, stylemap, 
         traceback.print_tb(exc_traceback)
         return False
 
-def render_all_states(pool, countries, states, directory, stylemap, only=[]):
+def render_all_states(pool, countries, states, directory, stylemap, only=[], area_filter_ppm=5000):
     """
     Render states
     """
