@@ -20,7 +20,7 @@ from .Projections import *
 from .ShapefileRecords import *
 from .NaturalEarth import *
 
-def shape_to_polys(shape, ref_bbox=None, filter_area_thresh=.001, proj="merc"):
+def shape_to_polys(shape, ref_bbox=None, filter_area_thresh=.01, proj="merc"):
     points = np.asarray(shape.points.copy())
     # Mirror by X axis
     # as lower latitude represent more southern coords (in contrast to SVG)
