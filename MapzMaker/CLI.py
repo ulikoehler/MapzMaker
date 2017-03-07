@@ -50,7 +50,6 @@ def perform_rasterize(parser, args):
     width = args.width
     # Create directory
     pngdir = os.path.join(args.directory, "PNG-{}".format(width))
-    os.makedirs(pngdir, exist_ok=True)
 
     # Assume we'll rasterize a lot
     # GIL can be ignored, because we're rasterizing using subprocess (inkscape)
@@ -74,7 +73,7 @@ def perform_rasterize(parser, args):
             svgpath = os.path.join(dirpath, filename)
             pngpath = os.path.join(pngdir, relpath, canonical + ".png")
             # Create directory tree
-            os.makedirs(os.path.dirname(pngpath), exist_ok=True)
+            os.makedirs(pngpath, exist_ok=True)
             print("Rasterizing to {}".format(pngpath))
             # Rasterize async
             futures.append(pool.submit(rasterize_svg, svgpath, pngpath, width))
