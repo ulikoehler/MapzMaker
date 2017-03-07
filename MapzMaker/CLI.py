@@ -27,11 +27,17 @@ def perform_render(parser, args):
     pool = concurrent.futures.ProcessPoolExecutor(args.parallel)
     futures = []
 
+    stylemap = {
+        "fill": args.fill,
+        "stroke": args.stroke,
+        "stroke_width": args.stroke_width
+    }
+
     if args.all:
         # Render all types of structures
-        futures += render_all_states(pool, countries, states, svgdir, args.color)
+        futures += render_all_states(pool, countries, states, svgdir, stylemap)
     else:
-        futures += render_all_states(pool, countries, states, svgdir, args.color, only=args.country)
+        futures += render_all_states(pool, countries, states, svgdir, stylemap, only=args.country)
     concurrent.futures.wait(futures)
 
 def perform_rasterize(parser, args):
@@ -108,7 +114,9 @@ def mapzmaker_cli():
     render = subparsers.add_parser("render")
     render.add_argument('country', nargs='*', help='The countries to render')
     render.add_argument('-a', '--all', action="store_true", help='Render all countries')
-    render.add_argument('-c', '--color', default="#000", help='HTML color code for SVG')
+    render.add_argument('-f', '--fill', default="#000", help='HTML color code for SVG, or \'none\'')
+    render.add_argument('-s', '--stroke', default="none", help='HTML stroke color code for SVG')
+    render.add_argument('-w', '--stroke-width', default="1", help='Stroke width for the outline')
     render.set_defaults(func=perform_render)
     # Render
     render = subparsers.add_parser("rasterize")
