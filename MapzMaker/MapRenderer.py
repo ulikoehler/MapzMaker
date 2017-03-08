@@ -43,7 +43,7 @@ def _set_viewbox(dwg, polys):
     # Compute bbox only from remaining points
     bbox = BoundingBox(np.vstack(polys))
     # Set SVG viewbox to bounding box
-    dwg.viewbox(width=bbox.width, height=bbox.height)
+    dwg.viewbox(bbox.minx, bbox.miny, bbox.width, bbox.height)
 
 def __draw_to_svg(dwg, poly, name, stylemap, objtype):
     dwg.add(svgwrite.shapes.Polygon(poly,

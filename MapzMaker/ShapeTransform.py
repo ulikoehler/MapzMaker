@@ -164,7 +164,7 @@ def iterative_merge_simplify(poly, threshold, nlimit=16, stopdiff=1):
             break
     return poly
             
-def normalize_coordinates_svg(polys, bbox):
+def normalize_coordinates_svg(points, bbox):
     """
     Normalize coordinates to 0,0 origin & coordinate scale
     which is suitable for SVG rendering.
