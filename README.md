@@ -36,4 +36,4 @@ Now we have some SVGs (you can have a look at them in your browser), but we can 
 
 Output example:
 
-![Map of Germany](https://github.com/ulikoehler/MapzMaker/blob/master/doc/Germany.png))
+![Map of Germany](https://github.com/ulikoehler/MapzMaker/blob/master/doc/Germany.png)
